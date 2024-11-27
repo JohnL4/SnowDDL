@@ -389,6 +389,7 @@ class TableResolver(AbstractSchemaObjectResolver):
             existing_columns[r["name"]] = TableColumn(
                 name=Ident(r["name"]),
                 type=DataType(dtype),
+                kind=r["kind"],
                 not_null=bool(r["null?"] == "N"),
                 default=r["default"] if r["default"] else None,
                 expression=r["expression"] if r["expression"] else None,
@@ -399,6 +400,8 @@ class TableResolver(AbstractSchemaObjectResolver):
         return existing_columns
 
     def _build_create_table(self, bp: TableBlueprint, snow_cols=None):
+        me = f"{type(self).__qualname__}._build_create_table(): "
+        self.engine.logger.debug( f"{me}: {bp.full_name}" )
         query = self.engine.query_builder()
         query.append("CREATE")
 
@@ -487,17 +490,30 @@ class TableResolver(AbstractSchemaObjectResolver):
             )
 
         if snow_cols:
+            self.engine.logger.debug( f"{me}: AS SELECT")
             query.append_nl("COPY GRANTS")
             query.append_nl("AS")
             query.append_nl("SELECT")
 
             for idx, c in enumerate(bp.columns):
                 col_name = str(c.name)
+                if bp.full_name == 'VP_INT_CLIENT.Z_LUSK.DEMO_VC':
+                    self.engine.logger.debug( f"{me}: col {col_name} c.kind = {c.kind} {'-' * 60}")
 
                 if col_name in snow_cols:
                     # Column already exist
+                    if bp.full_name == 'VP_INT_CLIENT.Z_LUSK.DEMO_VC':
+                        self.engine.logger.debug( f"{me}: col {col_name} snow_cols[col_name].kind = {snow_cols[col_name].kind}")
 
-                    if c.type == snow_cols[col_name].type:
+                    if c.kind and c.kind == "VIRTUAL":
+                        query.append_nl(
+                            "    -- {comma:r}{col_name:i} AS {col_name:i}    -- Virtual column omitted",
+                            {
+                                "comma": "  " if idx == 0 else ", ",
+                                "col_name": c.name,
+                            },
+                        )
+                    elif c.type == snow_cols[col_name].type:
                         # Column has the same type
                         query.append_nl(
                             "    {comma:r}{col_name:i} AS {col_name:i}",
@@ -527,16 +543,26 @@ class TableResolver(AbstractSchemaObjectResolver):
                             },
                         )
                 else:
-                    # Column does not exist, use default value with type cast
-                    query.append_nl(
-                        "    {comma:r}{col_val}::{col_type:r} AS {col_name:i}",
-                        {
-                            "comma": "  " if idx == 0 else ", ",
-                            "col_name": c.name,
-                            "col_type": c.type,
-                            "col_val": c.default,
-                        },
-                    )
+                    # Column does not exist
+                    if c.kind and c.kind == "VIRTUAL":
+                        query.append_nl(
+                            "    -- {comma:r}{col_name:i} AS {col_name:i}    -- Virtual column omitted",
+                            {
+                                "comma": "  " if idx == 0 else ", ",
+                                "col_name": c.name,
+                            },
+                        )
+                    else:
+                        # Use default value with type cast
+                        query.append_nl(
+                            "    {comma:r}{col_val}::{col_type:r} AS {col_name:i}",
+                            {
+                                "comma": "  " if idx == 0 else ", ",
+                                "col_name": c.name,
+                                "col_type": c.type,
+                                "col_val": c.default,
+                            },
+                        )
 
             query.append_nl(
                 "FROM {full_name:i}",

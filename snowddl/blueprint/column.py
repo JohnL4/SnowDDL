@@ -21,6 +21,7 @@ class ExternalTableColumn(BaseModelWithConfig):
 class TableColumn(BaseModelWithConfig):
     name: Ident
     type: DataType
+    kind: str = "COLUMN"        # COLUMN, VIRTUAL, etc. TODO: enum?
     not_null: bool = False
     default: Optional[Union[SchemaObjectIdent, str]] = None
     expression: Optional[str] = None

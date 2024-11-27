@@ -122,6 +122,9 @@ class TableConverter(AbstractSchemaObjectConverter):
             if c["null?"] == "N":
                 col["type"] = f"{col['type']} NOT NULL"
 
+            if c["kind"] == "VIRTUAL":
+                col["kind"] = c["kind"]
+
             if c["default"]:
                 i = identity_re.match(c["default"])
 

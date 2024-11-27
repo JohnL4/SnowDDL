@@ -48,6 +48,9 @@ table_json_schema = {
                             "type": {
                                 "type": "string"
                             },
+                            "kind": {
+                                "type": "string"
+                            },
                             "default": {
                                 "type": "string"
                             },
@@ -270,6 +273,7 @@ class TableParser(AbstractParser):
                 TableColumn(
                     name=Ident(col_name),
                     type=DataType(m.group("type")),
+                    kind=col.get("kind") or "COLUMN",
                     not_null=bool(m.group("not_null")),
                     default=col_default,
                     expression=col.get("expression"),
